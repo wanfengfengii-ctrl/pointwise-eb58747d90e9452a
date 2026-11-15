@@ -74,7 +74,54 @@ def regression():
     assert w.reachable() == [("b", "a"), ("b", "c")]
     w.close()
     locality(cyclic=False)
+    boundary()
     print("REGRESSION_OK: diamond, replacement, no-op, validation, cycle edge")
+
+
+def boundary():
+    # A self-loop only matters while it is the sole cycle witness.
+    w = Warehouse()
+    edges = {("a", "a"), ("a", "b")}
+    w.apply(edges)
+    compare(w, edges)
+    w.apply(remove=[("a", "a")])
+    edges.discard(("a", "a"))
+    compare(w, edges)
+    w.close()
+
+    # Two entries into one cycle: removing either keeps every pair,
+    # because the alternative path still supports the whole window.
+    w = Warehouse()
+    edges = {("r", "s"), ("r", "t"), ("s", "t"), ("t", "s"), ("t", "m")}
+    w.apply(edges)
+    compare(w, edges)
+    w.apply(remove=[("r", "s")])
+    edges.discard(("r", "s"))
+    compare(w, edges)
+    w.apply(remove=[("r", "t")])
+    edges.discard(("r", "t"))
+    compare(w, edges)
+    w.close()
+
+    # Same batch swaps the cycle entry: raw->stage out, raw->quality in.
+    w = Warehouse()
+    edges = set(INCIDENT)
+    w.apply(edges)
+    w.apply(add=[("raw", "quality")], remove=DISCONNECT)
+    edges.difference_update(DISCONNECT)
+    edges.add(("raw", "quality"))
+    compare(w, edges)
+    # Repeated removal is a no-op; re-adding restores the full closure.
+    w.apply(remove=DISCONNECT)
+    compare(w, edges)
+    w.apply(remove=[("raw", "quality")])
+    edges.discard(("raw", "quality"))
+    compare(w, edges)
+    w.apply(INCIDENT)
+    edges.update(INCIDENT)
+    compare(w, edges)
+    w.close()
+    print("BOUNDARY_OK: self-loop, cycle re-entry, batch swap, replay")
 
 
 def reproduce():
